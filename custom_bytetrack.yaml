@@ -1,0 +1,7 @@
+tracker_type: bytetrack # Tracker type
+track_high_thresh: 0.5  # Threshold for first association
+track_low_thresh: 0.1   # Threshold for second association
+new_track_thresh: 0.55   # Threshold to initialize a new track
+track_buffer: 25        # Frames to keep lost tracks alive
+match_thresh: 0.8       # Matching threshold for IOU
+fuse_score: True        # Whether to fuse confidence score with similarity

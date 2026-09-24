@@ -1,3 +1,6 @@
 ultralytics
-opencv-python
+opencv-python==4.8.0.74
 moviepy
+tqdm
+pillow==10.0.0
+numpy
