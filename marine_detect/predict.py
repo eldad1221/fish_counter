@@ -181,8 +181,9 @@ def predict_on_video(
         if success:
             combined_results = []
             for i, model in enumerate(models):
-                results = model(
+                results = model.track(
                     frame,
+                    persist=True,
                     conf=confs_threshold[i],
                 )
                 combined_results.extend(results)

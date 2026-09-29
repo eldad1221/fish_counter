@@ -2,6 +2,7 @@ import cv2
 from tqdm import tqdm
 from ultralytics import YOLO
 from common import get_home_video_filepath
+from main_video_predict import FISHINV_MODEL_PATH, MEGAFAUNA_MODEL_PATH
 
 FISH_CLASS_ID = 0
 
@@ -20,7 +21,7 @@ def process_frame(frame, model, counted_ids, target_class_id=FISH_CLASS_ID):
     and draws the bounding boxes and text.
     """
     # Define the custom classes to search for using text prompts
-    model.set_classes(["fish"])
+    model.set_classes(["fish", "shark", "whale", "dolphin", "ray"])  # Example classes; adjust as needed
 
     # Run detection and tracking (persist=True maintains IDs across frames)
     results = model.track(
@@ -219,17 +220,28 @@ def process_video(input_path, output_path, model_path="yolo26l.pt"):
     print(f"Total unique fish identified: {len(counted_ids)}")
 
 
-def main():
+def track_fish_in_video(input_video, model_path="yolo26l.pt"):
+    """
+    High-level function to track fish in a video and save the output.
+    """
+    video_filepath = get_home_video_filepath(input_video)
+    model = initialize_model(model_path)
+    results = model.track(video_filepath, show=True, persist=True)
+    print(f"Tracking completed. Results: {results}")
+
+
+
+def main(filename: str):
     """
     Entry point of the script. Defines paths and triggers the video processing.
     """
-    input_video = "GX015923.MP4"
-    video_filepath = get_home_video_filepath(input_video)
-    output_video = get_home_video_filepath(f'out_{input_video}')
+    video_filepath = get_home_video_filepath(filename)
+    output_video = get_home_video_filepath(f'out_{filename}')
     yolo_model = "yolov8l-worldv2.pt"
 
-    process_video(video_filepath, output_video, yolo_model)
+    track_fish_in_video(video_filepath, MEGAFAUNA_MODEL_PATH)
+    # process_video(video_filepath, output_video, yolo_model)
 
 
 if __name__ == "__main__":
-    main()
+    main("fish01.mp4")
