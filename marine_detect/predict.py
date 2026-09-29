@@ -14,7 +14,7 @@ Software description: Object detection models for identifying species in marine 
 """
 
 import os
-
+from pathlib import Path
 import cv2
 import numpy as np
 from PIL import ExifTags, Image
@@ -205,3 +205,123 @@ def predict_on_video(
     cap.release()
     out.release()
     cv2.destroyAllWindows()
+
+
+def predict_on_video_with_bboxes_save(
+    model_paths: list[str],
+    confs_threshold: list[float],
+    input_video_path: str,
+    output_video_path: str
+) -> None:
+    """
+    Processes a video using YOLO models, writes the annotated output video,
+    and crops detected objects into separate folders organized by tracking ID.
+    """
+    models = [YOLO(model_path) for model_path in model_paths]
+    cap = cv2.VideoCapture(input_video_path)
+
+    crops_output_dir = str(Path(output_video_path).with_suffix(''))
+    os.makedirs(crops_output_dir, exist_ok=True)
+
+    # Get video frame dimensions and frame rate
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
+
+    # Define the codec and create VideoWriter
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    out = cv2.VideoWriter(output_video_path, fourcc, frame_rate, (frame_width, frame_height))
+
+    frame_count = 0
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    with tqdm(total=total_frames, desc="Analyzing Video", unit="frame") as pbar:
+        while cap.isOpened():
+            success, frame = cap.read()
+            if not success:
+                break
+
+            frame_count += 1
+            combined_results = []
+
+            for i, model in enumerate(models):
+                results = model.track(
+                    frame,
+                    persist=True,
+                    conf=confs_threshold[i],
+                    verbose=False
+                )
+                combined_results.extend(results)
+
+                # Crop and save detected objects categorized by tracking ID
+                corp_and_save_detected_objects(
+                    frame=frame, results=combined_results,
+                    crops_output_dir=crops_output_dir,
+                    frame_count=frame_count
+                )
+
+            # Visualize results on frame and write to output video
+            annotated_frame = combine_results(frame, combined_results)
+            out.write(annotated_frame)
+
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+
+            pbar.update(1)
+
+    cap.release()
+    out.release()
+    cv2.destroyAllWindows()
+
+    print(f"Done! Saved to: {output_video_path}")
+
+
+def corp_and_save_detected_objects(
+    frame: np.ndarray,
+    results: list,
+    crops_output_dir: str,
+    frame_count: int,
+) -> None:
+    """
+    Crops detected objects from a video frame and saves them into separate folders
+    organized by tracking ID.
+
+    Args:
+        frame (np.ndarray): The original video frame.
+        results (list): List of detection results for the current frame.
+        crops_output_dir (str): Directory where cropped images will be saved.
+        frame_count (int): Current frame number in the video.
+
+    Returns:
+        None
+    """
+    frame_height, frame_width = frame.shape[:2]
+
+    for result in results:
+        if result.boxes and result.boxes.id is not None:
+            boxes = result.boxes.xyxy.cpu().numpy()
+            track_ids = result.boxes.id.int().cpu().tolist()
+
+            for box, track_id in zip(boxes, track_ids):
+                x1, y1, x2, y2 = map(int, box)
+
+                # Clamp coordinates to ensure they remain inside frame dimensions
+                x1 = max(0, x1)
+                y1 = max(0, y1)
+                x2 = min(frame_width, x2)
+                y2 = min(frame_height, y2)
+
+                # Crop object from the original unannotated frame
+                crop = frame[y1:y2, x1:x2]
+
+                # Skip invalid or empty crops
+                if crop.size == 0:
+                    continue
+
+                # Create a dedicated directory for this tracking ID
+                id_folder = os.path.join(crops_output_dir, f"fish_id_{track_id}")
+                os.makedirs(id_folder, exist_ok=True)
+
+                # Save the cropped fish image
+                crop_filename = f"fish_{track_id}_frame_{frame_count}.jpg"
+                crop_path = os.path.join(id_folder, crop_filename)
+                cv2.imwrite(crop_path, crop)
