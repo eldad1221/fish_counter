@@ -263,8 +263,8 @@ def main(video_filepath: str) -> None:
         input_video_path=video_filepath,
         output_video_path=output_video_path,
     )
+    count_detections_in_video(output_video_path)
 
 
 if __name__ == '__main__':
-    # main(f'{get_home_video_filepath("fish02.mp4")}')
-    count_detections_in_video(f'{get_home_video_filepath("out_fish09.mp4")}')
+    main(f'{get_home_video_filepath("GX010899.MP4")}')
